@@ -11,12 +11,18 @@ type Action<T> =
   | { type: "FETCH_SUCCESS"; payload: T }
   | { type: "FETCH_ERROR"; payload: Error };
 
-export function useQuery<T = unknown>(url: string, options?: RequestInit) {
+export function useQuery<T = unknown>(
+  url: string,
+  options?: RequestInit,
+  timeout?: number
+) {
   const initialState: State<T> = {
     data: undefined,
     error: undefined,
     loading: false,
   };
+
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchReducer = (state: State<T>, action: Action<T>): State<T> => {
     switch (action.type) {
@@ -29,6 +35,10 @@ export function useQuery<T = unknown>(url: string, options?: RequestInit) {
       default:
         return state;
     }
+  };
+
+  const clearTimer = () => {
+    timerRef.current && clearTimeout(timerRef.current);
   };
 
   const [state, dispatch] = React.useReducer(fetchReducer, initialState);
@@ -44,6 +54,17 @@ export function useQuery<T = unknown>(url: string, options?: RequestInit) {
     const signal = abortController.signal;
 
     async function fetchData() {
+      if (timeout) {
+        timerRef.current = setTimeout(() => {
+          abortController.abort();
+          ignore = true;
+          dispatch({
+            type: "FETCH_ERROR",
+            payload: new Error("Request exceeded timeout limit"),
+          });
+        }, timeout);
+      }
+
       dispatch({ type: "FETCH_START" });
       try {
         // add signal to fetch options
@@ -61,10 +82,12 @@ export function useQuery<T = unknown>(url: string, options?: RequestInit) {
         }
         if (ignore) return;
         const data = (await response.json()) as T;
+        clearTimer();
         dispatch({ type: "FETCH_SUCCESS", payload: data });
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         if (ignore) return;
+        clearTimer();
         dispatch({ type: "FETCH_ERROR", payload: e as Error });
       }
     }
@@ -75,6 +98,7 @@ export function useQuery<T = unknown>(url: string, options?: RequestInit) {
       //abort fetch on unmount
       abortController.abort();
       ignore = true;
+      clearTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);

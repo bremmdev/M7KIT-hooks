@@ -11,18 +11,7 @@ type Todo = {
 function App() {
   const [id, setId] = React.useState<number>(1);
   const { data, error, loading } = useQuery<Todo>(
-    'https://jsonplaceholder.typicode.com/posts', {
-  method: 'POST',
-  body: JSON.stringify({
-    title: 'foo',
-    body: 'bar',
-    userId: 456456456464644,
-    banana: 3
-  }),
-  headers: {
-    'Content-type': 'application/json; charset=UTF-8',
-  },
-})
+    'https://jsonplaceholder.typicode.com/posts/' + id, {}, 150)
   
 
   console.log(data)
